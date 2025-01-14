@@ -10,6 +10,9 @@
     "contextMenus",
     "storage"
   ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
   "content_scripts": [
     {
       "matches": ["https://github.com/*"],

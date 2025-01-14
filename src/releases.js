@@ -18,7 +18,7 @@ function getHotLevelColor(downloads) {
     return '';
 }
 
-async function fetchWithRetry(url, options = {}, retries = 3) {
+async function fetchWithRetry(url, options = {}, retries = 6) {
     for (let i = 0; i < retries; i++) {
         try {
             const response = await fetch(url, options);
@@ -31,45 +31,10 @@ async function fetchWithRetry(url, options = {}, retries = 3) {
 }
 
 async function fetchTotalDownloads(repoOwner, repoName) {
-    const cacheKey = `github_total_downloads_${repoOwner}_${repoName}`;
-    const cacheExpiryKey = `github_total_downloads_expiry_${repoOwner}_${repoName}`;
-    const cacheExpiryTime = 10 * 60 * 1000; // 10 minutes in milliseconds
-
-    const cachedData = await new Promise((resolve, reject) => {
-        chrome.storage.local.get([cacheKey, cacheExpiryKey], result => {
-            if (chrome.runtime.lastError) {
-                reject(chrome.runtime.lastError);
-            } else {
-                resolve(result);
-            }
-        });
-    });
-
-    const now = Date.now();
-
-    if (cachedData[cacheKey] && cachedData[cacheExpiryKey] && now < cachedData[cacheExpiryKey]) {
-        return JSON.parse(cachedData[cacheKey]);
-    }
-
-    const response = await fetchWithRetry(`https://api.github.com/repos/${repoOwner}/${repoName}/releases`);
-    const releases = await response.json();
+    const releases = await fetchReleaseDownloads(repoOwner, repoName);
     const totalDownloads = releases.reduce((acc, release) => {
         return acc + release.assets.reduce((assetAcc, asset) => assetAcc + asset.download_count, 0);
     }, 0);
-
-    await new Promise((resolve, reject) => {
-        chrome.storage.local.set({
-            [cacheKey]: JSON.stringify(totalDownloads),
-            [cacheExpiryKey]: now + cacheExpiryTime
-        }, () => {
-            if (chrome.runtime.lastError) {
-                reject(chrome.runtime.lastError);
-            } else {
-                resolve();
-            }
-        });
-    });
-
     return totalDownloads;
 }
 
@@ -113,6 +78,25 @@ async function fetchReleaseDownloads(repoOwner, repoName) {
     return releases;
 }
 
+function waitForElement(selector, timeout = 30000) {
+    return new Promise((resolve, reject) => {
+        const interval = 100;
+        let elapsedTime = 0;
+
+        const checkExist = setInterval(() => {
+            const element = document.querySelector(selector);
+            if (element) {
+                clearInterval(checkExist);
+                resolve(element);
+            } else if (elapsedTime >= timeout) {
+                clearInterval(checkExist);
+                reject(new Error(`Element with selector "${selector}" not found within ${timeout}ms`));
+            }
+            elapsedTime += interval;
+        }, interval);
+    });
+}
+
 function updateDownloads() {
     const pathParts = window.location.pathname.split('/');
     const repoOwner = pathParts[1];
@@ -121,34 +105,37 @@ function updateDownloads() {
     const isRepoSingleReleasesPage = pathParts.length === 6 && pathParts[3] === 'releases' && pathParts[4] === 'tag';
 
     if (isRepoHomePage) {
-        var releasesSummaryZone = document.querySelector("#repo-content-pjax-container > div > div > div > div.Layout-sidebar > div > div:nth-child(2) > div > a");
+        const releasesSummaryZone = waitForElement("#repo-content-pjax-container > div > div > div > div.Layout-sidebar > div > div:nth-child(2) > div > a");
+        releasesSummaryZone.then(ele => {
+            if (ele) {
+                fetchTotalDownloads(repoOwner, repoName).then(totalDownloads => {
+                    const downloads = document.createElement('div');
+                    downloads.innerText = `${humanReadableNumber(totalDownloads)} downloads`;
+                    downloads.title = `${totalDownloads} downloads`;
+                    downloads.style.color = getHotLevelColor(totalDownloads);
 
-        if (releasesSummaryZone) {
-            fetchTotalDownloads(repoOwner, repoName).then(totalDownloads => {
-                const downloads = document.createElement('div');
-                downloads.innerText = `${humanReadableNumber(totalDownloads)} downloads`;
-                downloads.title = `${totalDownloads} downloads`;
-                downloads.style.color = getHotLevelColor(totalDownloads);
-
-                releasesSummaryZone.append(downloads);
-            }).catch(error => {
-                console.error('Failed to fetch total downloads:', error);
-            });
-        }
+                    ele.append(downloads);
+                }).catch(error => {
+                    console.error('Failed to fetch total downloads:', error);
+                });
+            }
+        });
     } else if (isRepoSingleReleasesPage) {
         fetchReleaseDownloads(repoOwner, repoName).then(releases => {
             releases.forEach(release => {
                 if (release.tag_name !== pathParts[5]) return;
 
                 release.assets.forEach(asset => {
-                    const assetElement = document.querySelector(`a[href$="${asset.name}"]`);
-                    if (assetElement) {
-                        const downloads = document.createElement('span');
-                        downloads.innerText = ` (${humanReadableNumber(asset.download_count)} downloads)`;
-                        downloads.title = `${asset.download_count} downloads`;
-                        downloads.style.color = getHotLevelColor(asset.download_count);
-                        assetElement.parentNode.append(downloads);
-                    }
+                    const assetElement = waitForElement(`a[href$="${asset.name}"]`);
+                    assetElement.then(ele => {
+                        if (ele && ele.parentNode) {
+                            const downloads = document.createElement('span');
+                            downloads.innerText = ` (${humanReadableNumber(asset.download_count)} downloads)`;
+                            downloads.title = `${asset.download_count} downloads`;
+                            downloads.style.color = getHotLevelColor(asset.download_count);
+                            ele.parentNode.append(downloads);
+                        }
+                    })
                 });
             });
         }).catch(error => {
@@ -170,4 +157,16 @@ history.replaceState = function() {
 };
 
 window.addEventListener('popstate', updateDownloads);
+
+const observer = new MutationObserver(() => {
+    const currentPath = window.location.pathname;
+    if (currentPath !== observer.lastPath) {
+        observer.lastPath = currentPath;
+        updateDownloads();
+    }
+});
+
+observer.observe(document, { subtree: true, childList: true });
+observer.lastPath = window.location.pathname;
+
 updateDownloads();
