@@ -2,12 +2,13 @@
 
 ## Overview
 
-GitHub Assist is a Chrome extension that enhances your GitHub experience by displaying the total number of downloads for a repository's releases. It also shows the download count for each release file on the release page.
+GitHub Assist is a Chrome extension that enhances your GitHub experience by displaying the total number of downloads for a repository's releases. It also shows the download count for each release file on the release page and provides a mirror download link.
 
 ## Features
 
 - Display total downloads on the repository home page.
 - Show download counts for each release file on the release page.
+- Provide a mirror download link for each release file.
 - Caching support to reduce API calls and improve performance.
 - Retry mechanism for fetch requests to handle network issues.
 
@@ -25,7 +26,7 @@ GitHub Assist is a Chrome extension that enhances your GitHub experience by disp
 
 1. Navigate to any GitHub repository page.
 2. The total number of downloads will be displayed in the sidebar on the repository home page.
-3. On the release page, the download count for each release file will be shown next to the file name.
+3. On the release page, the download count for each release file will be shown next to the file name along with a mirror download link.
 
 ## Permissions
 
