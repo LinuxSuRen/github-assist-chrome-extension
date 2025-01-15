@@ -133,7 +133,15 @@ function updateDownloads() {
                             downloads.innerText = ` (${humanReadableNumber(asset.download_count)} downloads)`;
                             downloads.title = `${asset.download_count} downloads`;
                             downloads.style.color = getHotLevelColor(asset.download_count);
+
+                            const mirrorLink = document.createElement('a');
+                            mirrorLink.href = `https://files.m.daocloud.io/github.com/${ele.getAttribute('href')}`;
+                            mirrorLink.innerText = 'DaoCloud';
+                            mirrorLink.style.marginLeft = '10px';
+                            mirrorLink.style.color = 'blue';
+
                             ele.parentNode.append(downloads);
+                            ele.parentNode.append(mirrorLink);
                         }
                     })
                 });
