@@ -108,7 +108,7 @@ function renderChart(releases) {
     const container = waitForElement("#release_page_title");
     container.then(ele => {
         if (ele) {
-            ele.append(canvas);
+            ele.after(canvas);
         }
     });
 
