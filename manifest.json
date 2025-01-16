@@ -17,7 +17,7 @@
     {
       "matches": ["https://github.com/*"],
       "run_at": "document_idle",
-      "js": ["src/releases.js"]
+      "js": ["src/releases.js", "src/chart.min.js"]
     }
   ]
 }
