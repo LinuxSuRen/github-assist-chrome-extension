@@ -12,6 +12,12 @@ GitHub Assist is a Chrome extension that enhances your GitHub experience by disp
 - Caching support to reduce API calls and improve performance.
 - Retry mechanism for fetch requests to handle network issues.
 
+## Screenshots
+
+![image](https://github.com/user-attachments/assets/e0645933-c3f1-4b7e-90ef-55d8cee8ed0a)
+
+![image](https://github.com/user-attachments/assets/b39d9dcb-8932-4421-9987-cf64401ad0f2)
+
 ## Installation
 
 1. Clone the repository:
