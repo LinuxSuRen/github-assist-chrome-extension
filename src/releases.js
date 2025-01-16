@@ -1,5 +1,3 @@
-// https://api.github.com/repos/linuxsuren/api-testing/releases
-
 function humanReadableNumber(number) {
     if (number < 1000) return number;
     const units = ["K", "M", "B", "T"];
@@ -97,11 +95,61 @@ function waitForElement(selector, timeout = 30000) {
     });
 }
 
+function renderChart(releases) {
+    releases.sort((a, b) => a.tag_name.localeCompare(b.tag_name, undefined, { numeric: true, sensitivity: 'base' }));
+    const labels = releases.map(release => release.tag_name);
+    const data = releases.map(release => release.assets.reduce((acc, asset) => acc + asset.download_count, 0));
+
+    const canvas = document.createElement('canvas');
+    canvas.id = 'downloadsChart';
+    canvas.style.width = '100%';
+    canvas.style.height = '400px';
+
+    const container = waitForElement("#release_page_title");
+    container.then(ele => {
+        if (ele) {
+            ele.append(canvas);
+        }
+    });
+
+    new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Downloads',
+                data: data,
+                borderColor: 'rgba(75, 192, 192, 1)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                fill: true,
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Version'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Downloads'
+                    }
+                }
+            }
+        }
+    });
+}
+
 function updateDownloads() {
     const pathParts = window.location.pathname.split('/');
     const repoOwner = pathParts[1];
     const repoName = pathParts[2];
     const isRepoHomePage = pathParts.length === 3;
+    const isRepoReleasesPage = pathParts.length === 4 && pathParts[3] === 'releases';
     const isRepoSingleReleasesPage = pathParts.length === 6 && pathParts[3] === 'releases' && pathParts[4] === 'tag';
 
     if (isRepoHomePage) {
@@ -119,6 +167,12 @@ function updateDownloads() {
                     console.error('Failed to fetch total downloads:', error);
                 });
             }
+        });
+    } else if (isRepoReleasesPage) {
+        fetchReleaseDownloads(repoOwner, repoName).then(releases => {
+            renderChart(releases);
+        }).catch(error => {
+            console.error('Failed to fetch release downloads:', error);
         });
     } else if (isRepoSingleReleasesPage) {
         fetchReleaseDownloads(repoOwner, repoName).then(releases => {
