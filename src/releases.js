@@ -76,6 +76,43 @@ async function fetchReleaseDownloads(repoOwner, repoName) {
     return releases;
 }
 
+async function fetchStarHistory(repoOwner, repoName) {
+    let page = 1;
+    const stargazers = [];
+
+    while (true) {
+        const response = await fetchWithRetry(`https://api.github.com/repos/${repoOwner}/${repoName}/stargazers?page=${page}&per_page=100`, {
+            headers: {
+                Accept: 'application/vnd.github.v3.star+json'
+            }
+        });
+        const data = await response.json();
+        if (data.length === 0) break;
+        stargazers.push(...data);
+        page++;
+    }
+
+    const starHistory = {};
+    stargazers.forEach(stargazer => {
+        const date = new Date(stargazer.starred_at).toLocaleDateString();
+        if (!starHistory[date]) {
+            starHistory[date] = 0;
+        }
+        starHistory[date]++;
+    });
+
+    const labels = Object.keys(starHistory).sort((a, b) => new Date(a) - new Date(b));
+    const dailyData = labels.map(label => starHistory[label]);
+    const cumulativeData = [];
+    let cumulativeValue = 0;
+    labels.forEach((label, index) => {
+        cumulativeValue += dailyData[index];
+        cumulativeData.push(cumulativeValue);
+    });
+
+    return { labels, dailyData, cumulativeData };
+}
+
 function waitForElement(selector, timeout = 30000) {
     return new Promise((resolve, reject) => {
         const interval = 100;
@@ -144,6 +181,69 @@ function renderChart(releases) {
     });
 }
 
+function renderStarChart(starHistory, showCumulative = true) {
+    const { labels, dailyData, cumulativeData } = starHistory;
+    const data = showCumulative ? cumulativeData : dailyData;
+
+    const canvas = document.createElement('canvas');
+    canvas.id = 'starChart';
+    canvas.style.width = '100%';
+    canvas.style.height = '400px';
+
+    const container = waitForElement("#repo-content-pjax-container > div > div > div > div.Layout-main");
+    container.then(ele => {
+        if (ele) {
+            ele.prepend(canvas);
+        }
+    });
+
+    new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: showCumulative ? 'Cumulative Stars' : 'Daily Stars',
+                data: data,
+                borderColor: 'rgba(255, 99, 132, 1)',
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                fill: true,
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Stars'
+                    }
+                }
+            }
+        }
+    });
+
+    const toggleButton = document.createElement('button');
+    toggleButton.innerText = showCumulative ? 'Show Daily Stars' : 'Show Cumulative Stars';
+    toggleButton.style.marginTop = '10px';
+    toggleButton.onclick = () => {
+        canvas.remove();
+        toggleButton.remove();
+        renderStarChart(starHistory, !showCumulative);
+    };
+
+    container.then(ele => {
+        if (ele) {
+            ele.prepend(toggleButton);
+        }
+    });
+}
+
 function updateDownloads() {
     const pathParts = window.location.pathname.split('/');
     const repoOwner = pathParts[1];
@@ -167,6 +267,12 @@ function updateDownloads() {
                     console.error('Failed to fetch total downloads:', error);
                 });
             }
+        });
+
+        fetchStarHistory(repoOwner, repoName).then(starHistory => {
+            renderStarChart(starHistory);
+        }).catch(error => {
+            console.error('Failed to fetch star history:', error);
         });
     } else if (isRepoReleasesPage) {
         fetchReleaseDownloads(repoOwner, repoName).then(releases => {
