@@ -19,5 +19,6 @@
       "run_at": "document_idle",
       "js": ["src/releases.js", "src/chart.min.js"]
     }
-  ]
+  ],
+  "privacy_policy": "https://github.com/LinuxSuRen/github-assist-chrome-extension/blob/main/PRIVACY_POLICY.md"
 }

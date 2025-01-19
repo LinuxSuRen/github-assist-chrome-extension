@@ -45,3 +45,5 @@ GitHub Assist 是一个 Chrome 扩展，它通过显示仓库发布版本的总�
 ## 许可证
 
 此项目根据 MIT 许可证授权。有关详细信息，请参阅 [LICENSE](LICENSE) 文件。
+
+有关隐私政策，请参阅 [PRIVACY_POLICY.md](PRIVACY_POLICY.md)。
