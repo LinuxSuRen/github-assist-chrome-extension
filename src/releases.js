@@ -20,9 +20,15 @@ async function fetchWithRetry(url, options = {}, retries = 6) {
     for (let i = 0; i < retries; i++) {
         try {
             const response = await fetch(url, options);
+            if (response.status === 406 || response.status === 302) {
+                throw new Error('Need to login');
+            }
             if (!response.ok) throw new Error('Network response was not ok');
             return response;
         } catch (error) {
+            if (error.message === 'Need to login') {
+                throw error;
+            }
             if (i === retries - 1) throw error;
         }
     }
@@ -74,6 +80,22 @@ async function fetchReleaseDownloads(repoOwner, repoName) {
     });
 
     return releases;
+}
+
+async function fetchTrafficData(repoOwner, repoName) {
+    const url = `https://github.com/${repoOwner}/${repoName}/graphs/traffic-data`;
+    const options = {
+        credentials: 'include',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        }
+    };
+    const response = await fetchWithRetry(url, options);
+    if (!response.ok) {
+        throw new Error('Failed to fetch traffic data');
+    }
+    return response.json();
 }
 
 function waitForElement(selector, timeout = 30000) {
@@ -144,6 +166,79 @@ function renderChart(releases) {
     });
 }
 
+function renderTrafficChart(data) {
+    data.counts.sort((a, b) => a.bucket - b.bucket);
+    const labels = data.counts.map(item => {
+        const date = new Date(item.bucket * 1000);
+        return date.getMonth() + 1 + '/' + date.getDate();
+    });
+    const views = data.counts.map(item => item.total);
+    const uniqueViews = data.counts.map(item => item.unique);
+
+    const canvas = document.createElement('canvas');
+    canvas.hidden = true;
+
+    const nav = waitForElement('nav[aria-label="Repository files"] > ul')
+    nav.then(ele => {
+        const trafficChart = document.createElement('li');
+        trafficChart.innerHTML = `<a class="UnderlineTabbedInterface__StyledUnderlineItem-sc-4ilrg0-2 beOdPj">Traffic</a>`;
+        trafficChart.onclick = () => {
+            const zone = document.querySelector('div.js-snippet-clipboard-copy-unpositioned');
+            zone.replaceChildren(canvas);
+            canvas.hidden = false;
+            ele.querySelector('a[aria-current=page]').removeAttribute('aria-current');
+            trafficChart.querySelector('a').setAttribute('aria-current', 'page');
+        };
+        ele.appendChild(trafficChart);
+        ele.onclick = () => {
+            const eles = ele.querySelectorAll('a[aria-current=page]')
+            if (eles.length > 1) {
+                trafficChart.querySelector('a').removeAttribute('aria-current');
+            }
+        }
+    });
+
+    new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Total',
+                    data: views,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    fill: true,
+                },
+                {
+                    label: 'Unique',
+                    data: uniqueViews,
+                    borderColor: 'rgba(153, 102, 255, 1)',
+                    backgroundColor: 'rgba(153, 102, 255, 0.2)',
+                    fill: true,
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Count'
+                    }
+                }
+            }
+        }
+    });
+}
+
 function updateDownloads() {
     const pathParts = window.location.pathname.split('/');
     const repoOwner = pathParts[1];
@@ -167,6 +262,12 @@ function updateDownloads() {
                     console.error('Failed to fetch total downloads:', error);
                 });
             }
+        });
+
+        fetchTrafficData(repoOwner, repoName).then(data => {
+            renderTrafficChart(data);
+        }).catch(error => {
+            console.error('Failed to fetch traffic data:', error);
         });
     } else if (isRepoReleasesPage) {
         fetchReleaseDownloads(repoOwner, repoName).then(releases => {
