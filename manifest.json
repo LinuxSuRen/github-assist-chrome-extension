@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "GitHub Assist",
   "description": "GitHub Assist",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "homepage_url": "https://github.com/LinuxSuRen/github-assist-chrome-extension",
   "permissions": [
     "unlimitedStorage",
