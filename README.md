@@ -28,6 +28,10 @@ GitHub Assist is a Chrome extension that enhances your GitHub experience by disp
 3. Enable "Developer mode" by toggling the switch in the top right corner.
 4. Click on "Load unpacked" and select the cloned repository folder.
 
+## Download
+
+[Download from Chrome Web Store](https://chromewebstore.google.com/detail/github-assist/ijalankfpblkhemmljjkhiehhpiaihgj?hl=zh-CN&utm_source=ext_sidebar)
+
 ## Usage
 
 1. Navigate to any GitHub repository page.

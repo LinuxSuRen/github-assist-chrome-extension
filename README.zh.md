@@ -23,6 +23,10 @@ GitHub Assist 是一个 Chrome 扩展，它通过显示仓库发布版本的总�
 3. 通过切换右上角的开关启用“开发者模式”。
 4. 点击“加载已解压的扩展程序”，然后选择克隆的仓库文件夹。
 
+## 下载
+
+[从 Chrome 网上应用店下载](https://chromewebstore.google.com/detail/github-assist/ijalankfpblkhemmljjkhiehhpiaihgj?hl=zh-CN&utm_source=ext_sidebar)
+
 ## 使用
 
 1. 导航到任何 GitHub 仓库页面。

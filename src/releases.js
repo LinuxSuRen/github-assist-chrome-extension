@@ -16,6 +16,17 @@ function getHotLevelColor(downloads) {
     return '';
 }
 
+function getTimeIntervalBetweenReleases(releases) {
+    const intervals = [];
+    for (let i = 1; i < releases.length; i++) {
+        const previousReleaseDate = new Date(releases[i - 1].published_at);
+        const currentReleaseDate = new Date(releases[i].published_at);
+        const interval = Math.floor((currentReleaseDate - previousReleaseDate) / (1000 * 60 * 60 * 24));
+        intervals.push(interval);
+    }
+    return intervals;
+}
+
 async function fetchWithRetry(url, options = {}, retries = 6) {
     for (let i = 0; i < retries; i++) {
         try {
@@ -121,30 +132,74 @@ function renderChart(releases) {
     releases.sort((a, b) => a.tag_name.localeCompare(b.tag_name, undefined, { numeric: true, sensitivity: 'base' }));
     const labels = releases.map(release => release.tag_name);
     const data = releases.map(release => release.assets.reduce((acc, asset) => acc + asset.download_count, 0));
+    const intervals = getTimeIntervalBetweenReleases(releases);
+    const cumulativeData = data.reduce((acc, value) => {
+        if (acc.length > 0) {
+            acc.push(acc[acc.length - 1] + value);
+        } else {
+            acc.push(value);
+        }
+        return acc;
+    }, []);
 
     const canvas = document.createElement('canvas');
     canvas.id = 'downloadsChart';
-    canvas.style.width = '100%';
-    canvas.style.height = '400px';
 
-    const container = waitForElement("#release_page_title");
-    container.then(ele => {
-        if (ele) {
-            ele.after(canvas);
+    const nav = waitForElement('nav[aria-label="Repository files"] > ul')
+    nav.then(ele => {
+        // do nothing if the chart already exists
+        if (document.querySelector('#downloadsChart')) return;
+
+        const downloadsChart = document.createElement('li');
+        downloadsChart.innerHTML = `<a class="UnderlineTabbedInterface__StyledUnderlineItem-sc-4ilrg0-2 beOdPj">Downloads</a>`;
+        downloadsChart.onclick = () => {
+            const zone = document.querySelector('div.js-snippet-clipboard-copy-unpositioned');
+            zone.replaceChildren(canvas);
+            canvas.hidden = false;
+            ele.querySelector('a[aria-current=page]').removeAttribute('aria-current');
+            downloadsChart.querySelector('a').setAttribute('aria-current', 'page');
+        };
+        ele.appendChild(downloadsChart);
+        ele.onclick = () => {
+            const eles = ele.querySelectorAll('a[aria-current=page]')
+            if (eles.length > 1) {
+                downloadsChart.querySelector('a').removeAttribute('aria-current');
+            }
         }
     });
 
     new Chart(canvas, {
-        type: 'line',
+        type: 'bar',
         data: {
             labels: labels,
-            datasets: [{
-                label: 'Downloads',
-                data: data,
-                borderColor: 'rgba(75, 192, 192, 1)',
-                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                fill: true,
-            }]
+            datasets: [
+                {
+                    type: 'line',
+                    label: 'Downloads',
+                    data: data,
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    fill: true,
+                    yAxisID: 'y1',
+                },
+                {
+                    type: 'bar',
+                    label: 'Days Between Releases',
+                    data: [0, ...intervals],
+                    borderColor: 'rgba(255, 159, 64, 1)',
+                    backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                    yAxisID: 'y2',
+                },
+                {
+                    type: 'line',
+                    label: 'Cumulative Downloads',
+                    data: cumulativeData,
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    fill: true,
+                    yAxisID: 'y1',
+                }
+            ]
         },
         options: {
             responsive: true,
@@ -155,10 +210,23 @@ function renderChart(releases) {
                         text: 'Version'
                     }
                 },
-                y: {
+                y1: {
+                    type: 'linear',
+                    position: 'left',
                     title: {
                         display: true,
                         text: 'Downloads'
+                    }
+                },
+                y2: {
+                    type: 'linear',
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Days Between Releases'
+                    },
+                    grid: {
+                        drawOnChartArea: false
                     }
                 }
             }
@@ -177,9 +245,13 @@ function renderTrafficChart(data) {
 
     const canvas = document.createElement('canvas');
     canvas.hidden = true;
+    canvas.id = 'trafficChart';
 
     const nav = waitForElement('nav[aria-label="Repository files"] > ul')
     nav.then(ele => {
+        // do nothing if the chart already exists
+        if (document.querySelector('#trafficChart')) return;
+
         const trafficChart = document.createElement('li');
         trafficChart.innerHTML = `<a class="UnderlineTabbedInterface__StyledUnderlineItem-sc-4ilrg0-2 beOdPj">Traffic</a>`;
         trafficChart.onclick = () => {
@@ -250,12 +322,16 @@ function updateDownloads() {
     if (isRepoHomePage) {
         const releasesSummaryZone = waitForElement("#repo-content-pjax-container > div > div > div > div.Layout-sidebar > div > div:nth-child(2) > div > a");
         releasesSummaryZone.then(ele => {
+            // do nothing if the total downloads already exists
+            if (document.querySelector('#totalDownloads')) return;
+
             if (ele) {
                 fetchTotalDownloads(repoOwner, repoName).then(totalDownloads => {
                     const downloads = document.createElement('div');
                     downloads.innerText = `${humanReadableNumber(totalDownloads)} downloads`;
                     downloads.title = `${totalDownloads} downloads`;
                     downloads.style.color = getHotLevelColor(totalDownloads);
+                    downloads.id = 'totalDownloads';
 
                     ele.append(downloads);
                 }).catch(error => {
@@ -269,12 +345,14 @@ function updateDownloads() {
         }).catch(error => {
             console.error('Failed to fetch traffic data:', error);
         });
-    } else if (isRepoReleasesPage) {
+
         fetchReleaseDownloads(repoOwner, repoName).then(releases => {
             renderChart(releases);
         }).catch(error => {
             console.error('Failed to fetch release downloads:', error);
         });
+    } else if (isRepoReleasesPage) {
+        console.log('Repo releases page');
     } else if (isRepoSingleReleasesPage) {
         fetchReleaseDownloads(repoOwner, repoName).then(releases => {
             releases.forEach(release => {
