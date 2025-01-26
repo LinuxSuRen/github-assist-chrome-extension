@@ -6,8 +6,6 @@
   "homepage_url": "https://github.com/LinuxSuRen/github-assist-chrome-extension",
   "permissions": [
     "unlimitedStorage",
-    "notifications",
-    "contextMenus",
     "storage"
   ],
   "background": {
